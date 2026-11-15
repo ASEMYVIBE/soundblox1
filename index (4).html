@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>SoundBlox AI – 3D Pronunciation Obby</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1b2a49;--card:#fff;--a:#2f7bff;--b:#ff8a00;--ok:#1fc86a;--bad:#ff4d5e;--gold:#ffc61a;box-sizing:border-box}
+@media (prefers-color-scheme:dark){:root{--ink:#10192f}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;touch-action:none}
+html,body{height:100%;margin:0;overflow:hidden;font-family:'Fredoka','Trebuchet MS',system-ui,sans-serif;background:linear-gradient(#5db8ff,#d6f3ff);color:var(--ink)}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#hud{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 0;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.stats{display:flex;gap:8px}
+.chip{background:var(--card);border-radius:999px;padding:5px 14px;font-weight:700;font-size:18px;box-shadow:0 3px 0 rgba(27,42,73,.25)}
+#card{pointer-events:auto;background:var(--card);border-radius:20px;padding:10px 14px;text-align:center;box-shadow:0 5px 0 rgba(27,42,73,.25);max-width:min(94vw,460px)}
+#q{font-size:15px;opacity:.75}
+#word{font-size:34px;font-weight:700;line-height:1.1}
+#ipa{font-size:18px;color:#6a4bd8;margin-bottom:6px}
+.row{display:flex;gap:8px;justify-content:center}
+.snd{border:0;border-radius:14px;padding:9px 14px;font:700 17px 'Fredoka',sans-serif;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.25);cursor:pointer}
+.snd:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+#bW{background:#6a4bd8}#bA{background:var(--a)}#bB{background:var(--b)}
+.snd.on{outline:4px solid var(--gold)}
+#fb{min-height:22px;margin-top:6px;font-weight:700;font-size:16px}
+#fb.ok{color:#0b9a4d}#fb.no{color:#d62839}
+#pad{position:fixed;left:0;right:0;bottom:0;padding:0 14px calc(env(safe-area-inset-bottom,0px) + 14px);display:none;justify-content:space-between;align-items:flex-end}
+@media (hover:none),(max-width:700px){#pad{display:flex}}
+.dp{display:grid;grid-template:repeat(3,56px)/repeat(3,56px);gap:4px}
+.k{border:0;border-radius:16px;background:rgba(255,255,255,.85);font-size:24px;color:var(--ink);box-shadow:0 4px 0 rgba(27,42,73,.3)}
+.k.d{background:#fff}.k:active,.k.p{transform:translateY(3px);background:var(--gold)}
+#jump{width:92px;height:92px;border-radius:50%;background:var(--ok);color:#fff;font:700 18px 'Fredoka',sans-serif}
+#ov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,40,90,.55);padding:16px}
+#box{background:#fff;border-radius:26px;padding:22px 24px;max-width:430px;text-align:center;box-shadow:0 8px 0 rgba(27,42,73,.3)}
+#box h1{margin:0;font-size:36px;color:#2f7bff}#box h2{margin:2px 0 10px;font-size:20px;color:#ff8a00}
+#box p{margin:6px 0;font-size:16px;line-height:1.35}
+#go{margin-top:12px;font-size:22px;padding:12px 34px;background:var(--ok)}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="stats"><div class="chip" id="st">Stage 1/8</div><div class="chip" id="co">🪙 0</div><div class="chip" id="li">❤️❤️❤️</div></div>
+  <div id="card">
+    <div id="q">Which one says…</div><div id="word">think</div><div id="ipa">/θɪŋk/</div>
+    <div class="row"><button class="snd" id="bW">🔊 Word</button><button class="snd" id="bA">🔊 A</button><button class="snd" id="bB">🔊 B</button></div>
+    <div id="fb"></div>
+  </div>
+</div>
+<div id="pad">
+  <div class="dp"><span></span><button class="k" data-k="up">▲</button><span></span><button class="k" data-k="left">◀</button><span></span><button class="k" data-k="right">▶</button><span></span><button class="k" data-k="down">▼</button><span></span></div>
+  <button class="k" id="jump" data-k="jump">JUMP</button>
+</div>
+<div id="ov"><div id="box">
+  <h1 id="t1">SoundBlox AI</h1><h2 id="t2">3D Pronunciation Obby</h2>
+  <p id="t3">Сөзді тыңда, дұрыс айтылған платформаға секір!<br>Listen, then jump on the platform that says the word correctly.</p>
+  <p id="t4">💻 WASD / arrows + Space &nbsp; 📱 on-screen buttons<br>🪙 correct = coin &nbsp; ❤️ wrong = lose a life</p>
+  <button class="snd" id="go">Play</button>
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const WORDS=[
+{w:'think',ipa:'/θɪŋk/',bad:['tink','sink']},{w:'three',ipa:'/θriː/',bad:['tree','free']},
+{w:'thank',ipa:'/θæŋk/',bad:['tank','sank']},{w:'thirty',ipa:'/ˈθɜːrti/',bad:['dirty','sirty']},
+{w:'this',ipa:'/ðɪs/',bad:['dis','zis']},{w:'that',ipa:'/ðæt/',bad:['dat','zat']},
+{w:'mother',ipa:'/ˈmʌðər/',bad:['modder','muzzer']},{w:'brother',ipa:'/ˈbrʌðər/',bad:['brodder','bruzzer']}];
+const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+/* ---------- speech ---------- */
+let voice=null;function pick(){try{const v=speechSynthesis.getVoices();voice=v.find(x=>/en[-_]US/i.test(x.lang))||v.find(x=>/^en/i.test(x.lang))||null}catch(e){}}
+try{speechSynthesis.onvoiceschanged=pick;pick()}catch(e){}
+function say(t,rate=.6){return new Promise(r=>{try{const u=new SpeechSynthesisUtterance(t);u.lang='en-US';if(voice)u.voice=voice;u.rate=rate;u.onend=u.onerror=()=>r();speechSynthesis.speak(u)}catch(e){r()}})}
+let tok=0;
+function mark(id,on){if(id)$(id).classList.toggle('on',on)}
+async function seq(items){const k=++tok;try{speechSynthesis.cancel()}catch(e){}for(const[t,h]of items){if(k!==tok)return;mark(h,1);await say(t);mark(h,0);await sleep(300)}}
+/* ---------- three.js ---------- */
+const cv=$('c'),ren=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+ren.setPixelRatio(Math.min(2,devicePixelRatio||1));
+const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(60,1,.1,300);
+scene.add(new THREE.HemisphereLight(0xffffff,0x88aaff,.85));
+const sun=new THREE.DirectionalLight(0xffffff,.7);sun.position.set(6,14,8);scene.add(sun);
+function resize(){const w=innerWidth,h=innerHeight;ren.setSize(w,h,false);cam.aspect=w/h;cam.fov=w<h?72:60;cam.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+function studTex(){const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');g.fillStyle='rgba(255,255,255,.28)';g.beginPath();g.arc(32,32,16,0,7);g.fill();g.strokeStyle='rgba(0,0,0,.12)';g.lineWidth=3;g.strokeRect(0,0,64,64);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t}
+const ST=studTex();
+function letterTex(ch,col){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');g.fillStyle='#fff';g.beginPath();g.arc(128,128,112,0,7);g.fill();g.fillStyle=col;g.font='700 170px Fredoka, Trebuchet MS, sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(ch,128,138);return new THREE.CanvasTexture(c)}
+const plats=[],obst=[],stages=[],GAP=44;
+function addPlat(x,z,w,d,color,g){
+  const m=new THREE.MeshLambertMaterial({color}),mesh=new THREE.Mesh(new THREE.BoxGeometry(w,1,d),m);mesh.position.set(x,-.5,z);scene.add(mesh);
+  const t=ST.clone();t.needsUpdate=true;t.repeat.set(w/2,d/2);
+  const o=new THREE.Mesh(new THREE.PlaneGeometry(w,d),new THREE.MeshBasicMaterial({map:t,transparent:true}));o.rotation.x=-Math.PI/2;o.position.set(x,.01,z);scene.add(o);
+  const p={x,z,w,d,top:0,mat:m,base:color};plats.push(p);return p}
+const COL=[0x3ddc84,0xffd23f,0xb264ff,0x4dd0e1,0xff7ab8,0x8bc34a,0xffa726,0x5c8dff];
+WORDS.forEach((_,i)=>{
+  const z=-i*GAP,con=addPlat(0,z,9,12,COL[i],0),fa=addPlat(-6,z-12.5,7,7,0x2f7bff),fb=addPlat(6,z-12.5,7,7,0xff8a00);
+  [[fa,'A','#2f7bff',-6],[fb,'B','#ff8a00',6]].forEach(([p,ch,col,x])=>{const l=new THREE.Mesh(new THREE.PlaneGeometry(3.2,3.2),new THREE.MeshBasicMaterial({map:letterTex(ch,col),transparent:true}));l.rotation.x=-Math.PI/2;l.position.set(x,.03,z-12.5);scene.add(l)});
+  fa.choice=0;fb.choice=1;
+  const ob=new THREE.Mesh(new THREE.BoxGeometry(2,1.2,1),new THREE.MeshLambertMaterial({color:0xff4d5e}));ob.position.set(0,.6,z-1);scene.add(ob);obst.push({m:ob,z:z-1,i});
+  stages.push({z,con,fa,fb})});
+/* floating decor */
+for(let i=0;i<70;i++){const s=1+Math.random()*3,m=new THREE.Mesh(new THREE.BoxGeometry(s,s,s),new THREE.MeshLambertMaterial({color:i%3?0xffffff:[0xff7ab8,0xffd23f,0x4dd0e1][i%3]}));
+  m.position.set((Math.random()<.5?-1:1)*(14+Math.random()*30),-6+Math.random()*22,-Math.random()*GAP*8);m.userData.s=Math.random()*.6;scene.add(m)}
+/* player */
+const pl=new THREE.Group();
+const bx=(w,h,d,c,x,y,z,par)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color:c}));m.position.set(x,y,z);par.add(m);return m};
+const limb=(w,h,c,x,y)=>{const g=new THREE.Group();g.position.set(x,y,0);bx(w,h,.3,c,0,-h/2,0,g);pl.add(g);return g};
+bx(.7,.6,.36,0x2f7bff,0,.3,0,pl);bx(.46,.4,.4,0xffd23f,0,.8,0,pl);
+[-.1,.1].forEach(x=>bx(.07,.1,.02,0x111111,x,.85,-.21,pl));bx(.2,.04,.02,0x111111,0,.72,-.21,pl);
+const armL=limb(.24,.6,0xffd23f,-.48,.6),armR=limb(.24,.6,0xffd23f,.48,.6),legL=limb(.3,.5,0x3ddc84,-.17,0),legR=limb(.3,.5,0x3ddc84,.17,0);
+scene.add(pl);
+const P={x:0,y:.5,z:0,vy:0,prevBottom:0};
+/* input */
+const K={left:0,right:0,up:0,down:0,jump:0};
+const map={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',Space:'jump'};
+addEventListener('keydown',e=>{if(map[e.code]){K[map[e.code]]=1;e.preventDefault()}});
+addEventListener('keyup',e=>{if(map[e.code])K[map[e.code]]=0});
+document.querySelectorAll('[data-k]').forEach(b=>{const k=b.dataset.k,on=e=>{e.preventDefault();K[k]=1;b.classList.add('p')},off=()=>{K[k]=0;b.classList.remove('p')};
+  b.addEventListener('pointerdown',on);['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,off))});
+/* game state */
+let res=true,walkT=0,face=0,S=0,coins=0,lives=3,state='menu',ans=[0,0],cor=0,hold=0,cur=null;
+function hud(){$('st').textContent='Stage '+(S+1)+'/8';$('co').textContent='🪙 '+coins;$('li').textContent=lives>0?'❤️'.repeat(lives):'💔'}
+function fb(t,c){const f=$('fb');f.textContent=t;f.className=c||''}
+function respawn(){const s=stages[S];P.x=0;P.y=.5;P.z=s.z+4;P.vy=0;P.prevBottom=0;cam.position.set(0,6,P.z+9)}
+function setStage(){
+  const W=WORDS[S],s=stages[S];state='play';hold=0;cur=null;fb('');hud();
+  s.fa.mat.color.setHex(0x2f7bff);s.fb.mat.color.setHex(0xff8a00);
+  cor=Math.random()<.5?0:1;const bad=W.bad[Math.floor(Math.random()*2)];ans=cor===0?[W.w,bad]:[bad,W.w];
+  s.bad=bad;$('word').textContent=W.w;$('ipa').textContent=W.ipa;$('q').textContent='Which platform says it right? Listen!';
+  respawn();play()}
+function play(){const W=WORDS[S];seq([[W.w,'bW'],[ans[0],'bA'],[ans[1],'bB']])}
+$('bW').onclick=()=>seq([[WORDS[S].w,'bW']]);
+$('bA').onclick=()=>seq([[ans[0],'bA']]);
+$('bB').onclick=()=>seq([[ans[1],'bB']]);
+async function choose(k){
+  if(state!=='play')return;state='fb';res=k===cor;const s=stages[S],W=WORDS[S],pf=k===0?s.fa:s.fb;
+  if(k===cor){coins++;pf.mat.color.setHex(0x1fc86a);fb('✔ Great! '+W.w+' '+W.ipa,'ok');hud();seq([[W.w,'bW']]);
+    await sleep(2400);if(S>=7)return end(true);S++;setStage()}
+  else{lives--;pf.mat.color.setHex(0xff4d5e);fb('✘ That was “'+s.bad+'”. Tongue between your teeth!','no');hud();seq([[s.bad,null],[W.w,'bW']]);
+    await sleep(2800);if(lives<=0)return end(false);s.fa.mat.color.setHex(0x2f7bff);s.fb.mat.color.setHex(0xff8a00);state='play';hold=0;cur=null;respawn();fb('Try again!');play()}}
+function end(win){state='menu';$('ov').style.display='flex';
+  $('t1').textContent=win?'You did it! 🎉':'Game over';$('t2').textContent='Coins: '+coins+' / 8';
+  $('t3').innerHTML=win?'Қасқа! Great listening!<br>Керемет жұмыс!':'Қайталап көр! Listen again and try one more time.';$('t4').textContent='';$('go').textContent='Play again'}
+$('go').onclick=()=>{S=0;coins=0;lives=3;$('ov').style.display='none';state='play';setStage()};
+/* loop */
+let last=0;
+function update(dt,t){
+  obst.forEach(o=>{o.m.position.x=Math.sin(t*1.6+o.i)*3.2});
+  scene.children.forEach(c=>{if(c.userData.s)c.rotation.y+=c.userData.s*dt});
+  if(state==='play'||state==='fb'){
+    if(state==='play'){let ix=K.right-K.left,iz=K.down-K.up;const l=Math.hypot(ix,iz);if(l){P.x+=ix/l*8*dt;P.z+=iz/l*8*dt}}
+    P.prevBottom=P.y-.5;P.vy-=30*dt;P.y+=P.vy*dt;let g=false;cur=null;
+    for(const p of plats){if(Math.abs(P.x-p.x)<p.w/2+.4&&Math.abs(P.z-p.z)<p.d/2+.4&&P.vy<=0&&P.prevBottom>=p.top-.02&&P.y-.5<=p.top){P.y=p.top+.5;P.vy=0;g=true;cur=p}
+      else if(Math.abs(P.x-p.x)<p.w/2+.4&&Math.abs(P.z-p.z)<p.d/2+.4&&Math.abs(P.y-.5-p.top)<.02&&P.vy===0){g=true;cur=p}}
+    if(g&&K.jump&&state==='play')P.vy=12.5;
+    if(state==='play'){
+      if(cur&&cur.choice!==undefined){hold+=dt;if(hold>.3)choose(cur.choice)}else hold=0;
+      const o=obst[S];if(Math.abs(P.x-o.m.position.x)<1.45&&Math.abs(P.z-o.z)<.95&&P.y-.5<1.2){fb('Oops! Jump over the red block.');respawn()}
+      if(P.y<-14){fb('You fell! Try again.');respawn()}}
+    if(state==='fb'&&P.y<-14)respawn();
+  }
+  pl.position.set(P.x,P.y,P.z);
+  {const mx=K.right-K.left,mz=K.down-K.up,mv=state==='play'&&(mx||mz),air=!cur;
+  if(mv){const a=Math.atan2(-mx,-mz);let d=a-face;d=Math.atan2(Math.sin(d),Math.cos(d));face+=d*Math.min(1,dt*14)}
+  pl.rotation.y=face;pl.rotation.z=0;walkT+=dt*(mv?11:2);
+  const sw=mv&&!air?Math.sin(walkT)*.95:Math.sin(walkT)*.05;let aL=-sw,aR=sw,lL=sw,lR=-sw;
+  if(air){aL=aR=2.6;lL=.5;lR=-.4}
+  if(state==='fb'){if(res){aL=2.8+Math.sin(t*14)*.5;aR=2.8-Math.sin(t*14)*.5;lL=lR=0;pl.position.y+=Math.abs(Math.sin(t*9))*.35}else{aL=aR=.15;lL=lR=0;pl.rotation.z=Math.sin(t*35)*.12}}
+  armL.rotation.x=aL;armR.rotation.x=aR;legL.rotation.x=lL;legR.rotation.x=lR}
+  const tx=P.x*.6,ty=P.y+5.5,tz=P.z+9;cam.position.x+=(tx-cam.position.x)*Math.min(1,dt*5);cam.position.y+=(ty-cam.position.y)*Math.min(1,dt*5);cam.position.z+=(tz-cam.position.z)*Math.min(1,dt*5);
+  cam.lookAt(P.x*.6,P.y+.5,P.z-6)}
+function loop(ms){requestAnimationFrame(loop);const dt=Math.min(.05,(ms-last)/1000||0);last=ms;update(dt,ms/1000);ren.render(scene,cam)}
+respawn();hud();requestAnimationFrame(loop);
+</script></body></html>
